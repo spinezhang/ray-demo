@@ -1,0 +1,10 @@
+*.xml
+*.iml
+*.pyc
+.idea/
+venv/
+__pycache__/
+.DS_Store
+all.py
+pytest.ini
+.pytest_cache/
