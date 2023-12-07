@@ -5,10 +5,9 @@ from ray.train.torch import TorchTrainer
 import ray.train.torch
 from torch.nn.parallel import DistributedDataParallel
 import torch
-from PIL import Image
-from torchvision import transforms
 
 from cnn_image_torch import ImageTrainerTorch, ImageCnnTorch
+from image_data_builder import ImageDataBuilder
 
 
 class ImageTrainerTorchRay(ImageTrainerTorch):
@@ -62,10 +61,9 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
 
     @staticmethod
     def image_from_buffer(pic):
-        img = Image.frombuffer('RGB', (32, 32), pic)
-        return transforms.ToTensor()(img)
+        image = ImageDataBuilder.image_transform(pic)
+        return image.numpy()
 
     def extract_item(self, item):
-        transform = transforms.Compose([ImageTrainerTorchRay.image_from_buffer, transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        image = torch.as_tensor(np.array(list(map(transform, item['image']))))
-        return image, torch.as_tensor(item['label'])
+        images = np.array(list(map(ImageTrainerTorchRay.image_from_buffer, item['image'])))
+        return torch.as_tensor(images), torch.as_tensor(item['label'])

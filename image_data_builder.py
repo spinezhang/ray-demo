@@ -1,6 +1,9 @@
 import os
 import pickle
 from abc import abstractmethod
+
+import numpy as np
+from PIL import Image
 from pyarrow import RecordBatch
 import pyarrow as pa
 from torchvision import transforms
@@ -52,6 +55,13 @@ class ImageDataBuilder:
         ids = list(range(len(labels)))
         schema = pa.schema([pa.field('id', pa.int64()), pa.field('image', pa.binary()), pa.field('label', pa.int64())], metadata={'mode': 'RGB', 'size': '32, 32'})
         return RecordBatch.from_arrays([ids, images, labels], schema)
+
+    @staticmethod
+    def image_transform(pic):
+        image = np.array([np.frombuffer(pic, dtype=np.uint8)])
+        image = image.reshape(-1, 3, 32, 32).transpose((0, 2, 3, 1))
+        image = ImageDataBuilder.transform(Image.fromarray(image[0]))
+        return image
 
     @abstractmethod
     def file_ready(self):

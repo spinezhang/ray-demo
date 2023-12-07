@@ -1,8 +1,6 @@
 import math
 import random
-import numpy as np
 import torch
-from PIL import Image
 from torch.utils.data import IterableDataset, get_worker_info
 from pyarrow import compute
 
@@ -40,9 +38,7 @@ class ArrowImageDataset(IterableDataset):
                 random.shuffle(indexes)
             for i in indexes:
                 item = rb.slice(offset=i, length=1).to_pylist()[0]
-                image = np.array([np.frombuffer(item['image'], dtype=np.uint8)])
-                image = image.reshape(-1, 3, 32, 32).transpose((0, 2, 3, 1))
-                image = ImageDataBuilder.transform(Image.fromarray(image[0]))
+                image = ImageDataBuilder.image_transform(item['image'])
                 row = (image, item['label'])
                 yield row
 

@@ -1,4 +1,5 @@
 import getopt
+import os
 import sys
 import traceback
 from cnn_image_raytorch import ImageTrainerTorchRay
@@ -10,7 +11,7 @@ from datetime import datetime
 
 
 def parse_args(argv):
-    storage_f = "deltaspark"
+    storage_f = "deltalake"
     framework_f = "pytorch"
     ray_f = 1
 
@@ -40,16 +41,18 @@ if __name__ == "__main__":
     else:
         ray_data = False
 
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    original_file_path = os.path.join(current_dir, "data/cifar-10-batches-py")
     if storage == "deltaspark":
-        image_data = DeltaSparkBuilder("./data/delta_spark", ray_data)
+        image_data = DeltaSparkBuilder(os.path.join(current_dir, "data/delta_spark"), ray_data)
     elif storage == "deltalake":
-        image_data = DeltalakeImageBuilder("./data/delta_lake", ray_data)
+        image_data = DeltalakeImageBuilder(os.path.join(current_dir, "data/delta_lake"), ray_data)
     else:
-        image_data = LocalBuilder("./data/cifar-10-batches-py", ray_data=False)
+        image_data = LocalBuilder(original_file_path, ray_data=False)
 
     if not isinstance(image_data, LocalBuilder) and not image_data.file_ready():
-        image_data.store_data("./data/cifar-10-batches-py", is_train=True)
-        image_data.store_data("./data/cifar-10-batches-py", is_train=False)
+        image_data.store_data(original_file_path, is_train=True)
+        image_data.store_data(original_file_path, is_train=False)
 
     try:
         train_config = {"num_classes": 10, "use_gpu": False, "num_epochs": 2, "batch_size": 64, "num_workers": 8}
