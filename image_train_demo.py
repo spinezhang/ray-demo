@@ -14,7 +14,7 @@ from datetime import datetime
 def parse_args(argv):
     storage_f = "deltalake"
     framework_f = "torch"
-    ray_f = "0"
+    ray_f = "1"
 
     short_opts = "h:s:f:r:"
     long_opts = ["help", "storage", "framework", "ray"]
@@ -60,6 +60,8 @@ if __name__ == "__main__":
         train_config = {"num_classes": 10, "use_gpu": True, "num_epochs": 5, "batch_size": 50, "num_workers": 6}
         if framework == "torch":
             if ray == "1":
+                train_config['use_gpu'] = False  # GPU distribution not working on Mac
+                train_config['work_dir'] = current_dir
                 ImageTrainerTorchRay.build_and_train(image_data, train_config)
             else:
                 ImageTrainerTorchSingle.build_and_train(image_data, train_config)

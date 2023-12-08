@@ -141,7 +141,6 @@ class ImageTrainerTorch(ImageTorchProcess):
             self.model.train()
             train_acc = 0.0
             train_loss = 0.0
-            print(len(self.train_data))
 
             _, optimizer, train_acc, train_loss = self.extract_data_and_process(self.train_data, self.train_images, loss_fn, optimizer, train_acc, train_loss)
 
