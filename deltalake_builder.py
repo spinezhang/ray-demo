@@ -1,4 +1,6 @@
 import os
+from abc import ABC
+
 import deltalake
 import ray
 from deltalake import DeltaTable
@@ -7,7 +9,7 @@ from image_data_builder import ImageDataBuilder
 from arrow_dataset import ArrowImageDataset
 
 
-class DeltalakeImageBuilder(ImageDataBuilder):
+class DeltalakeImageBuilder(ImageDataBuilder, ABC):
     def __init__(self, path):
         super().__init__(path)
 

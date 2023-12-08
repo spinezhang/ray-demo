@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -8,7 +9,7 @@ import ray.train.torch
 from torch.nn.parallel import DistributedDataParallel
 import torch
 
-from cnn_image_torch import ImageTrainerTorch, ImageCnnTorch
+from cnn_image_torch import ImageTrainerTorch, ImageCnnTorch, ImageTorchProcess
 from image_data_builder import ImageDataBuilder
 
 
@@ -30,7 +31,6 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
 
     def save_checkpoint(self, epoch, train_acc, train_loss, test_acc):
         base_model = (self.model.module if isinstance(self.model, DistributedDataParallel) else self.model)
-        # torch.save(base_model.state_dict(), 'cifar10_ray_{}.model'.format(epoch))
         checkpoint = None
         # In standard DDP training, where the model is the same across all ranks,
         # only the global rank 0 worker needs to save and report the checkpoint
@@ -67,7 +67,6 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
 
     @staticmethod
     def train_loop_per_worker(config):
-        print(config)
         net = ImageCnnTorch(num_classes=config['num_classes'])
         model = ImageTrainerTorchRay(net, config)
         model.train(config['num_epochs'])
@@ -80,3 +79,35 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
     def extract_item(self, item):
         images = np.array(list(map(ImageTrainerTorchRay.image_from_buffer, item['image'])))
         return torch.as_tensor(images), torch.as_tensor(item['label'])
+
+
+test_acc = 0
+count = 0
+
+
+class ImageTorchInferenceRay(ImageTorchProcess):
+    def __init__(self, model, path, use_gpu=True):
+        super().__init__(use_gpu)
+        checkpoint = torch.load(path)
+        model.load_state_dict({k.replace('module.', ''): v for k, v in checkpoint.items()})
+        self.model = self.prepare_model(model)
+
+    def prepare_model(self, model):
+        model.to(self.device)
+        model.eval()
+        return model
+
+    def __call__(self, batch_data):
+        images = np.array(list(map(ImageTrainerTorchRay.image_from_buffer, batch_data['image'])))
+        torch.inference_mode()
+        outputs = self.model(torch.as_tensor(images))
+        prediction = outputs.argmax(dim=1)
+        correct_count = torch.sum(prediction == torch.as_tensor(batch_data['label']).data).item()
+        return {'correct_count': np.array([correct_count])}
+
+    def batch_predict(self, test_dataset, batch_size=200, num_workers=6):
+        length = test_dataset.count()
+        prediction = test_dataset.map_batches(self, batch_size=batch_size, compute=ray.data.ActorPoolStrategy(size=num_workers), zero_copy_batch=True)
+        prediction.take_all()
+        correct_count = prediction.sum('correct_count')
+        return correct_count / length

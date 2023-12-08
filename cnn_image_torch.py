@@ -81,6 +81,7 @@ class ImageTorchProcess:
                 if device.type != 'mps':
                     device = torch.device('cpu')
         self.device = device
+        self.use_gpu = use_gpu
 
     def extract_data_and_process(self, data_loader, process_func, *args):
         progress = tqdm(data_loader)
@@ -107,7 +108,7 @@ class ImageTorchProcess:
     @staticmethod
     def test_images(images, labels, model, test_acc):
         outputs = model(images)
-        _, prediction = torch.max(outputs.data, 1)
+        prediction = outputs.argmax(dim=1)
         test_acc += torch.sum(prediction == labels.data).item()
         return model, test_acc
 
@@ -218,7 +219,7 @@ class ImageTorchInferenceSingle(ImageTorchProcess):
         model = DataParallel(self.model)
         self.model = model.to(self.device)
 
-    def test_dataset(self, test_dataset):
+    def batch_predict(self, test_dataset):
         length = len(test_dataset)
         test_data = DataLoader(test_dataset, batch_size=50, num_workers=4)
         return self.test(self.model, test_data, length)

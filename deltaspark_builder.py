@@ -1,3 +1,5 @@
+from abc import ABC
+
 import pyspark
 import ray
 from delta import configure_spark_with_delta_pip
@@ -7,7 +9,7 @@ from deltalake_builder import DeltalakeImageBuilder
 from image_data_builder import ImageDataBuilder
 
 
-class DeltaSparkBuilder(DeltalakeImageBuilder):
+class DeltaSparkBuilder(DeltalakeImageBuilder, ABC):
     def __init__(self, path):
         super().__init__(path)
 
