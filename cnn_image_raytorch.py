@@ -62,7 +62,7 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
     @staticmethod
     def image_from_buffer(pic):
         image = ImageDataBuilder.image_transform(pic)
-        return image.numpy()
+        return image
 
     def extract_item(self, item):
         images = np.array(list(map(ImageTrainerTorchRay.image_from_buffer, item['image'])))

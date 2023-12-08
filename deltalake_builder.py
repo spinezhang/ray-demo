@@ -8,8 +8,8 @@ from arrow_dataset import ArrowImageDataset
 
 
 class DeltalakeImageBuilder(ImageDataBuilder):
-    def __init__(self, path, ray_data=True):
-        super().__init__(path, ray_data)
+    def __init__(self, path):
+        super().__init__(path)
 
     def file_ready(self):
         return os.path.exists(self.table_file_path(False))

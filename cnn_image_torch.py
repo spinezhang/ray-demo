@@ -68,39 +68,61 @@ class Unit(nn.Module):
         return output
 
 
-# Create a learning rate adjustment function that divides the learning rate by 10 every 30 epochs
-def adjust_learning_rate(epoch, optimizer):
-    lr = 0.001
+class ImageTorchProcess:
+    def __init__(self, use_gpu=True):
+        if not use_gpu:
+            device = torch.device('cpu')
+        else:
+            cuda_avail = torch.cuda.is_available()
+            if cuda_avail:
+                device = torch.device('cuda')
+            else:
+                device = torch.device("mps")
+                if device.type != 'mps':
+                    device = torch.device('cpu')
+        self.device = device
 
-    if epoch > 180:
-        lr = lr / 1000000
-    elif epoch > 150:
-        lr = lr / 100000
-    elif epoch > 120:
-        lr = lr / 10000
-    elif epoch > 90:
-        lr = lr / 1000
-    elif epoch > 60:
-        lr = lr / 100
-    elif epoch > 30:
-        lr = lr / 10
+    def extract_data_and_process(self, data_loader, process_func, *args):
+        progress = tqdm(data_loader)
+        for item in progress:
+            images, labels = self.extract_item(item)
+            images = Variable(images)
+            images, labels = self.data_to_device(images, labels)
+            args = process_func(images, labels, *args)
+        return args
 
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
+    def data_to_device(self, images, labels):
+        return images.to(self.device), labels.to(self.device)
+
+    def extract_item(self, item):
+        return item[0], item[1]
+
+    def test(self, model, test_loader, length):
+        test_acc = 0.0
+        _, test_acc = self.extract_data_and_process(test_loader, self.test_images, model, test_acc)
+        # Compute the average acc and loss over all 10000 test images
+        test_acc = test_acc / length
+        return test_acc
+
+    @staticmethod
+    def test_images(images, labels, model, test_acc):
+        outputs = model(images)
+        _, prediction = torch.max(outputs.data, 1)
+        test_acc += torch.sum(prediction == labels.data).item()
+        return model, test_acc
 
 
-class ImageTrainerTorch:
-    def __init__(self, model):
+class ImageTrainerTorch(ImageTorchProcess):
+    def __init__(self, model, use_gpu):
+        super().__init__(use_gpu)
         self.model = model
         self.train_data = None
         self.test_data = None
+        self.train_len = 0
+        self.test_len = 0
 
     @abstractmethod
     def prepare_model(self):
-        pass
-
-    @abstractmethod
-    def data_to_device(self, images, labels):
         pass
 
     @abstractmethod
@@ -119,31 +141,20 @@ class ImageTrainerTorch:
             self.model.train()
             train_acc = 0.0
             train_loss = 0.0
+            print(len(self.train_data))
 
             _, optimizer, train_acc, train_loss = self.extract_data_and_process(self.train_data, self.train_images, loss_fn, optimizer, train_acc, train_loss)
 
-            # Call the learning rate adjustment function
-            adjust_learning_rate(epoch, optimizer)
-
             # Compute the average acc and loss over all 50000 training images
-            train_acc = train_acc / 50000
-            train_loss = train_loss / 50000
+            train_acc = train_acc / self.train_len
+            train_loss = train_loss / self.train_len
 
             # Evaluate on the test set
-            test_acc = self.test(self.test_data)
+            self.model.eval()
+            test_acc = self.test(self.model, self.test_data, self.test_len)
 
             # Save the model if the test acc is greater than our current best
             self.save_checkpoint(epoch, train_acc, train_loss, test_acc)
-
-    def extract_data_and_process(self, data_loader, process_func, *args):
-        progress = tqdm(data_loader)
-        for item in progress:
-            images, labels = self.extract_item(item)
-            images = Variable(images)
-
-            images, labels = self.data_to_device(images, labels)
-            args = process_func(images, labels, *args)
-        return args
 
     def train_images(self, images, labels, loss_fn, optimizer, train_acc, train_loss):
         # print(f"training image, label{labels}")
@@ -161,69 +172,54 @@ class ImageTrainerTorch:
         train_acc += torch.sum(prediction == labels.data).item()
         return loss_fn, optimizer, train_acc, train_loss
 
-    def test(self, test_loader):
-        self.model.eval()
-        test_acc = 0.0
-        test_acc, _ = self.extract_data_and_process(test_loader, self.test_images, test_acc, 0)
-
-        # Compute the average acc and loss over all 10000 test images
-        test_acc = test_acc / 10000
-
-        return test_acc
-
-    def test_images(self, images, labels, test_acc, dummy):
-        outputs = self.model(images)
-        _, prediction = torch.max(outputs.data, 1)
-        test_acc += torch.sum(prediction == labels.data).item()
-        return test_acc, dummy
-
-    @abstractmethod
-    def extract_item(self, item):
-        pass
-
-
-def get_device():
-    cuda_avail = torch.cuda.is_available()
-    if cuda_avail:
-        return torch.device('cuda')
-    device = torch.device("mps")
-    if device.type != 'mps':
-        return torch.device('cpu')
-    return device
-
 
 class ImageTrainerTorchSingle(ImageTrainerTorch):
-    def __init__(self, model, train_data, test_data, use_gpu=False):
-        super(ImageTrainerTorchSingle, self).__init__(model)
+    def __init__(self, model, train_data, test_data, config):
+        super(ImageTrainerTorchSingle, self).__init__(model, config['use_gpu'])
         self.train_data = train_data
         self.test_data = test_data
-        if use_gpu:
-            self.device = get_device()
-        else:
-            self.device = torch.device('cpu')
+        self.train_len = len(train_data)
+        self.test_len = len(test_data)
+        self.batch_size = config['batch_size']
+        self.num_workers = config["num_workers"]
+        self.test_acc = 0
 
     def prepare_model(self):
         model = DataParallel(self.model)
         self.model = model.to(self.device)
-
-    def data_to_device(self, images, labels):
-        return images.to(self.device), labels.to(self.device)
+        self.train_data = DataLoader(self.train_data, batch_size=self.batch_size, num_workers=self.num_workers)
+        self.test_data = DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def save_checkpoint(self, epoch, train_acc, train_loss, test_acc):
-        torch.save(self.model.state_dict(), "cifar10model_{}.model".format(epoch))
+        if test_acc > self.test_acc:
+            torch.save(self.model.state_dict(), "cifar10_torch_single.model")
+            self.test_acc = test_acc
         # Print the metrics
         print("Epoch {}, Train Accuracy: {} , TrainLoss: {}, Test Accuracy: {}".format(epoch, train_acc, train_loss, test_acc))
 
     @staticmethod
     def build_and_train(image_data, config):
-        batch_size = config['batch_size']
-        num_workers = config['num_workers']
-        train_data = DataLoader(image_data.load_to_torch_dateset(is_train=True), batch_size=batch_size, num_workers=num_workers)
-        test_data = DataLoader(image_data.load_to_torch_dateset(is_train=False), batch_size=batch_size, num_workers=num_workers)
+        train_data = image_data.load_to_torch_dateset(is_train=True)
+        test_data = image_data.load_to_torch_dateset(is_train=False)
 
         net = ImageCnnTorch(num_classes=config['num_classes'])
-        model = ImageTrainerTorchSingle(net, train_data, test_data, config['use_gpu'])
+        model = ImageTrainerTorchSingle(net, train_data, test_data, config)
         model.train(config['num_epochs'])
 
-    def extract_item(self, item):
-        return item[0], item[1]
+
+class ImageTorchInferenceSingle(ImageTorchProcess):
+    def __init__(self, model, path, use_gpu=True):
+        super().__init__(use_gpu)
+        checkpoint = torch.load(path)
+        model.load_state_dict({k.replace('module.', ''): v for k, v in checkpoint.items()})
+        self.model = model
+        self.prepare_model()
+
+    def prepare_model(self):
+        model = DataParallel(self.model)
+        self.model = model.to(self.device)
+
+    def test_dataset(self, test_dataset):
+        length = len(test_dataset)
+        test_data = DataLoader(test_dataset, batch_size=50, num_workers=4)
+        return self.test(self.model, test_data, length)

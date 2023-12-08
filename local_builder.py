@@ -3,7 +3,6 @@ import numpy as np
 import ray
 import pyarrow as pa
 from PIL import Image
-from pyarrow import RecordBatch
 from torch.utils.data import Dataset
 
 from image_data_builder import ImageDataBuilder
@@ -26,8 +25,8 @@ class MemoryTorchDataset(Dataset):
 
 
 class LocalBuilder(ImageDataBuilder):
-    def __init__(self, path, ray_data=False):
-        super().__init__(path, ray_data)
+    def __init__(self, path):
+        super().__init__(path)
 
     def load_to_torch_dateset(self, is_train=True):
         images, labels = ImageDataBuilder.load_torchvision_data(self.data_path, is_train)
@@ -42,3 +41,6 @@ class LocalBuilder(ImageDataBuilder):
         images, labels = ImageDataBuilder.load_torchvision_data(self.data_path, is_train)
         pa_table = pa.table([images, labels], names=["image", "label"])
         return ray.data.from_arrow(pa_table)
+
+    def load_to_tensor(self, is_train=True):
+        return ImageDataBuilder.load_torchvision_data(self.data_path, is_train)

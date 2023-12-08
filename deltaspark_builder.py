@@ -8,8 +8,8 @@ from image_data_builder import ImageDataBuilder
 
 
 class DeltaSparkBuilder(DeltalakeImageBuilder):
-    def __init__(self, path, ray_data=True):
-        super().__init__(path, ray_data)
+    def __init__(self, path):
+        super().__init__(path)
 
         builder = (
             pyspark.sql.SparkSession.builder.appName("deltatorch-demo")

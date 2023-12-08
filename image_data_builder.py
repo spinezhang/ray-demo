@@ -3,18 +3,13 @@ import pickle
 from abc import abstractmethod
 
 import numpy as np
-from PIL import Image
 from pyarrow import RecordBatch
 import pyarrow as pa
-from torchvision import transforms
 
 
 class ImageDataBuilder:
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
-    def __init__(self, path, ray_data=True):
+    def __init__(self, path):
         self.data_path = path
-        self.ray_data = ray_data
 
     @staticmethod
     def read_torchvision_files(src_path, file_list):
@@ -58,10 +53,9 @@ class ImageDataBuilder:
 
     @staticmethod
     def image_transform(pic):
-        image = np.array([np.frombuffer(pic, dtype=np.uint8)])
-        image = image.reshape(-1, 3, 32, 32).transpose((0, 2, 3, 1))
-        image = ImageDataBuilder.transform(Image.fromarray(image[0]))
-        return image
+        image = np.array([np.frombuffer(pic, dtype=np.uint8)]).astype(np.float32) / 255.0
+        image = image.reshape(-1, 3, 32, 32)
+        return image[0]
 
     @abstractmethod
     def file_ready(self):
@@ -73,5 +67,9 @@ class ImageDataBuilder:
 
     @abstractmethod
     def load_to_ray_dateset(self, is_train=True):
+        pass
+
+    @abstractmethod
+    def load_to_tensor(self, is_train=True):
         pass
 
