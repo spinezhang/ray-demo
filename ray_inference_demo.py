@@ -1,6 +1,6 @@
 import os
 
-from cnn_image_raytorch import ImageTorchInferenceRay
+from image_train_raytorch import ImageTorchInferenceRay
 from tests.test_cnn_image_torch import prepare_model_and_data_builder
 
 if __name__ == "__main__":

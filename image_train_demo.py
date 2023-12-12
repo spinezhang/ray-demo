@@ -2,12 +2,19 @@ import getopt
 import os
 import sys
 import traceback
-from cnn_image_raytorch import ImageTrainerTorchRay
-from cnn_image_tensor import ImageTrainerTFSingle
-from cnn_image_torch import ImageTrainerTorchSingle
-from deltalake_builder import DeltalakeImageBuilder
-from deltaspark_builder import DeltaSparkBuilder
-from local_builder import LocalBuilder
+
+from data_builder.deltalake_ray_builder import DeltaLakeRayBuilder
+from data_builder.deltalake_tensor_builder import DeltaLakeTensorBuilder
+from data_builder.deltalake_torch_builder import DeltaLakeTorchBuilder
+from data_builder.deltaspark_ray_builder import DeltaSparkRayBuilder
+from data_builder.deltaspark_tensor_builder import DeltaSparkTensorBuilder
+from data_builder.deltaspark_torch_builder import DeltaSparkTorchBuilder
+from data_builder.local_ray_builder import LocalRayBuilder
+from image_train_raytensor import ImageTrainerTFRay
+from image_train_raytorch import ImageTrainerTorchRay
+from image_cnn_tensor import ImageTrainerTFSingle
+from image_train_torch import ImageTrainerTorchSingle
+from data_builder.local_torch_builder import LocalTorchBuilder
 from datetime import datetime
 
 
@@ -33,40 +40,64 @@ def parse_args(argv):
     return storage_f, framework_f, ray_f
 
 
+def get_data_builder(storage, framework, ray):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    original_file_path = os.path.join(current_dir, "data/cifar-10-batches-py")
+    if storage == "deltalake":
+        if ray == "1":
+            data_builder = DeltaLakeRayBuilder(os.path.join(current_dir, "data/delta_lake"))
+        elif framework == 'torch':
+            data_builder = DeltaLakeTorchBuilder(os.path.join(current_dir, "data/delta_lake"))
+        else:
+            data_builder = DeltaLakeTensorBuilder(os.path.join(current_dir, "data/delta_lake"))
+    elif storage == "deltaspark":
+        if ray == "1":
+            data_builder = DeltaSparkRayBuilder(os.path.join(current_dir, "data/delta_spark"))
+        elif framework == 'torch':
+            data_builder = DeltaSparkTorchBuilder(os.path.join(current_dir, "data/delta_spark"))
+        else:
+            data_builder = DeltaSparkTensorBuilder(os.path.join(current_dir, "data/delta_spark"))
+    else:
+        if ray == "1":
+            data_builder = LocalRayBuilder(original_file_path)
+        elif framework == 'torch':
+            data_builder = LocalTorchBuilder(original_file_path)
+        # else:
+        #     data_builder = DeltaSparkTensorBuilder(current_dir, "data/delta_spark")
+    if not isinstance(data_builder, LocalTorchBuilder) and not data_builder.file_ready():
+        data_builder.store_data(original_file_path, is_train=True)
+        data_builder.store_data(original_file_path, is_train=False)
+
+    train_data = data_builder.to_dataset(is_train=True)
+    test_data = data_builder.to_dataset(is_train=False)
+
+    return train_data, test_data
+
+
 if __name__ == "__main__":
     storage, framework, ray = parse_args(sys.argv[1:])
     print(f"args: storage:{storage}, framework:{framework}, ray:{ray}")
     start_time = datetime.now()
 
-    if ray == "1":
-        ray_data = True
-    else:
-        ray_data = False
-
+    train_data, test_data = get_data_builder(storage, framework, ray)
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    original_file_path = os.path.join(current_dir, "data/cifar-10-batches-py")
-    if storage == "deltaspark":
-        image_data = DeltaSparkBuilder(os.path.join(current_dir, "data/delta_spark"))
-    elif storage == "deltalake":
-        image_data = DeltalakeImageBuilder(os.path.join(current_dir, "data/delta_lake"))
-    else:
-        image_data = LocalBuilder(original_file_path)
-
-    if not isinstance(image_data, LocalBuilder) and not image_data.file_ready():
-        image_data.store_data(original_file_path, is_train=True)
-        image_data.store_data(original_file_path, is_train=False)
 
     try:
-        train_config = {"num_classes": 10, "use_gpu": True, "num_epochs": 5, "batch_size": 50, "num_workers": 6}
+        train_config = {"num_classes": 10, "use_gpu": True, "num_epochs": 2, "batch_size": 50, "num_workers": 6}
         if framework == "torch":
             if ray == "1":
                 train_config['use_gpu'] = False  # GPU distribution not working on Mac
                 train_config['work_dir'] = current_dir
-                ImageTrainerTorchRay.build_and_train(image_data, train_config)
+                ImageTrainerTorchRay.build_and_train(train_data, test_data, train_config)
             else:
-                ImageTrainerTorchSingle.build_and_train(image_data, train_config)
+                ImageTrainerTorchSingle.build_and_train(train_data, test_data, train_config)
         else:
-            ImageTrainerTFSingle.build_and_train(image_data, train_config)
+            if ray == "1":
+                train_config['use_gpu'] = False  # GPU distribution not working on Mac
+                train_config['work_dir'] = current_dir
+                ImageTrainerTFRay.build_and_train(train_data, test_data, train_config)
+            else:
+                ImageTrainerTFSingle.build_and_train(train_data, test_data, train_config)
 
         end_time = datetime.now()
         print(f"test_image used {round((end_time - start_time).total_seconds(), 3)}s")
