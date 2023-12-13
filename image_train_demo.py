@@ -10,9 +10,11 @@ from data_builder.deltaspark_ray_builder import DeltaSparkRayBuilder
 from data_builder.deltaspark_tensor_builder import DeltaSparkTensorBuilder
 from data_builder.deltaspark_torch_builder import DeltaSparkTorchBuilder
 from data_builder.local_ray_builder import LocalRayBuilder
+from model.cnn_tensor import CnnTensorModel
+from model.cnn_torch import CnnTorchModel
 from image_train_raytensor import ImageTrainerTFRay
 from image_train_raytorch import ImageTrainerTorchRay
-from image_cnn_tensor import ImageTrainerTFSingle
+from image_train_tensor import ImageTrainerTFSingle
 from image_train_torch import ImageTrainerTorchSingle
 from data_builder.local_torch_builder import LocalTorchBuilder
 from datetime import datetime
@@ -21,7 +23,7 @@ from datetime import datetime
 def parse_args(argv):
     storage_f = "deltalake"
     framework_f = "torch"
-    ray_f = "1"
+    ray_f = "0"
 
     short_opts = "h:s:f:r:"
     long_opts = ["help", "storage", "framework", "ray"]
@@ -83,21 +85,31 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
     try:
-        train_config = {"num_classes": 10, "use_gpu": True, "num_epochs": 2, "batch_size": 50, "num_workers": 6}
+        train_config = {"use_gpu": True, "num_epochs": 2, "batch_size": 50, "num_workers": 6}
+        if ray == "1":
+            train_config['use_gpu'] = False  # GPU distribution not working on Mac
+            train_config['work_dir'] = '/tmp/ray'
+
+        if framework == 'torch':
+            model = CnnTorchModel(num_classes=10)
+            # model = AlexNet(num_classes=10)
+        elif ray == "1":
+            # ray tensorflow does not support pass model instance, for the 'name' in Sequential cannot be pickled.
+            # the model must be instanced in worker entry and after the strategy is created, so here pass the class type.
+            model = CnnTensorModel
+        else:
+            model = CnnTensorModel(num_classes=10)
+
         if framework == "torch":
             if ray == "1":
-                train_config['use_gpu'] = False  # GPU distribution not working on Mac
-                train_config['work_dir'] = current_dir
-                ImageTrainerTorchRay.build_and_train(train_data, test_data, train_config)
+                ImageTrainerTorchRay.build_and_train(model, train_data, test_data, train_config)
             else:
-                ImageTrainerTorchSingle.build_and_train(train_data, test_data, train_config)
+                ImageTrainerTorchSingle.build_and_train(model, train_data, test_data, train_config)
         else:
             if ray == "1":
-                train_config['use_gpu'] = False  # GPU distribution not working on Mac
-                train_config['work_dir'] = current_dir
-                ImageTrainerTFRay.build_and_train(train_data, test_data, train_config)
+                ImageTrainerTFRay.build_and_train(model, train_data, test_data, train_config)
             else:
-                ImageTrainerTFSingle.build_and_train(train_data, test_data, train_config)
+                ImageTrainerTFSingle.build_and_train(model, train_data, test_data, train_config)
 
         end_time = datetime.now()
         print(f"test_image used {round((end_time - start_time).total_seconds(), 3)}s")

@@ -9,13 +9,12 @@ from torch.nn.parallel import DistributedDataParallel
 import torch
 
 from image_train_torch import ImageTrainerTorch, ImageTorchProcess
-from image_cnn_torch import ImageCnnTorch
 from data_builder.image_data_builder import ImageDataBuilder
 
 
 class ImageTrainerTorchRay(ImageTrainerTorch):
-    def __init__(self, net, config):
-        super(ImageTrainerTorchRay, self).__init__(net, config['use_gpu'])
+    def __init__(self, model, config):
+        super(ImageTrainerTorchRay, self).__init__(model, config['use_gpu'])
         self.batch_size = config['batch_size']
         self.train_data = ray.train.get_dataset_shard('train')
         self.test_data = ray.train.get_dataset_shard('test')
@@ -24,13 +23,13 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
         self.work_dir = config['work_dir']
 
     def prepare_model(self):
-        self.net = ray.train.torch.prepare_model(self.net)
+        self.model = ray.train.torch.prepare_model(self.model)
 
         self.train_data = self.train_data.iter_batches(batch_size=self.batch_size, local_shuffle_buffer_size=50)
         self.test_data = self.test_data.iter_batches(batch_size=self.batch_size)
 
     def save_checkpoint(self, epoch, train_acc, train_loss, test_acc):
-        base_model = (self.net.module if isinstance(self.net, DistributedDataParallel) else self.net)
+        base_model = (self.model.module if isinstance(self.model, DistributedDataParallel) else self.model)
         checkpoint = None
         # In standard DDP training, where the model is the same across all ranks,
         # only the global rank 0 worker needs to save and report the checkpoint
@@ -43,9 +42,10 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
         ray.train.report({'train_acc': train_acc, 'train_loss': train_loss, 'test_acc': test_acc}, checkpoint=checkpoint)
 
     @staticmethod
-    def build_and_train(train_data, test_data, config):
+    def build_and_train(network, train_data, test_data, config):
         scaling_config = ScalingConfig(num_workers=config['num_workers'], use_gpu=config['use_gpu'])
         datasets = {'train': train_data, 'test': test_data}
+        config['model'] = network
         config['train_len'] = train_data.count()
         config['test_len'] = test_data.count()
         trainer = TorchTrainer(
@@ -65,9 +65,7 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
 
     @staticmethod
     def train_loop_per_worker(config):
-        net = ImageCnnTorch(num_classes=config['num_classes'])
-        # net = AlexNet(num_classes=config["num_classes"])
-        model = ImageTrainerTorchRay(net, config)
+        model = ImageTrainerTorchRay(config['model'], config)
         model.train(config['num_epochs'])
 
     def extract_item(self, item):
@@ -80,16 +78,16 @@ count = 0
 
 
 class ImageTorchInferenceRay(ImageTorchProcess):
-    def __init__(self, net, path, use_gpu=True):
+    def __init__(self, model, path, use_gpu=True):
         super().__init__(use_gpu)
         checkpoint = torch.load(path)
-        net.load_state_dict({k.replace('module.', ''): v for k, v in checkpoint.items()})
-        self.net = self.prepare_model(net)
+        model.load_state_dict({k.replace('module.', ''): v for k, v in checkpoint.items()})
+        self.net = self.prepare_model(model)
 
-    def prepare_model(self, net):
-        net.to(self.device)
-        net.eval()
-        return net
+    def prepare_model(self, model):
+        model.to(self.device)
+        model.eval()
+        return model
 
     def __call__(self, batch_data):
         images = np.array(list(map(ImageDataBuilder.image_transform, batch_data['image'])))

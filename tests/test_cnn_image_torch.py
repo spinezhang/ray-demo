@@ -1,14 +1,13 @@
 import os
 
-from alex_net_torch import AlexNet
 from data_builder.deltalake_torch_builder import DeltaLakeTorchBuilder
-from image_cnn_torch import ImageCnnTorch
+from model.cnn_torch import CnnTorchModel
 from image_train_torch import ImageTorchInferenceSingle
 
 
 def prepare_model_and_data_builder(InferenceClass, model_path, data_path, use_gpu=False):
-    net = ImageCnnTorch(num_classes=10)
-    # net = AlexNet(num_classes=10)
+    net = CnnTorchModel(num_classes=10)
+    # model = AlexNet(num_classes=10)
     inference = InferenceClass(net, model_path, use_gpu)
     image_data = DeltaLakeTorchBuilder(data_path)
     return inference, image_data

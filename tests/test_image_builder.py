@@ -9,7 +9,7 @@ from data_builder.deltaspark_builder import DeltaSparkBuilder
 from data_builder.deltalake_torch_builder import DeltaLakeTorchBuilder
 from data_builder.deltaspark_torch_builder import DeltaSparkTorchBuilder
 from data_builder.local_torch_builder import LocalTorchBuilder
-from image_cnn_tensor import _fixup_shape
+from image_train_tensor import _fixup_shape
 
 
 def verify_torch_data(data_loader, once=True):
