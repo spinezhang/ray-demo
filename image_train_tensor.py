@@ -1,4 +1,3 @@
-from abc import abstractmethod
 import numpy as np
 import tensorflow as tf
 
@@ -22,10 +21,6 @@ class ImageTrainerTF:
 
     def save(self, file):
         self.model.save(file)
-
-    @abstractmethod
-    def save_checkpoint(self, epoch, train_acc, train_loss, test_acc):
-        pass
 
 
 def fix_dataset_shape(image, label):

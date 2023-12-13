@@ -36,16 +36,16 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
         if ray.train.get_context().get_world_rank() == 0:
             torch.save(
                 base_model.state_dict(),  # NOTE: Unwrap the model.
-                os.path.join(self.work_dir, 'cifar10_ray.model'),
+                os.path.join(self.work_dir, 'cifar10_ray_torch.model'),
             )
             # checkpoint = Checkpoint.from_directory(self.work_dir)
         ray.train.report({'train_acc': train_acc, 'train_loss': train_loss, 'test_acc': test_acc}, checkpoint=checkpoint)
 
     @staticmethod
-    def build_and_train(network, train_data, test_data, config):
+    def build_and_train(model, train_data, test_data, config):
         scaling_config = ScalingConfig(num_workers=config['num_workers'], use_gpu=config['use_gpu'])
         datasets = {'train': train_data, 'test': test_data}
-        config['model'] = network
+        config['model'] = model
         config['train_len'] = train_data.count()
         config['test_len'] = test_data.count()
         trainer = TorchTrainer(
@@ -59,7 +59,6 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
             datasets=datasets
         )
 
-        # Train the model.
         result = trainer.fit()
         return result
 
@@ -71,10 +70,6 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
     def extract_item(self, item):
         images = np.array(list(map(ImageDataBuilder.image_transform, item['image'])))
         return torch.as_tensor(images), torch.as_tensor(item['label'])
-
-
-test_acc = 0
-count = 0
 
 
 class ImageTorchInferenceRay(ImageTorchProcess):
@@ -103,5 +98,3 @@ class ImageTorchInferenceRay(ImageTorchProcess):
         prediction.take_all()
         correct_count = prediction.sum('correct_count')
         return correct_count / length
-
-    # def predict(self, image):

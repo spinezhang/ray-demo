@@ -12,7 +12,7 @@ from data_builder.deltaspark_torch_builder import DeltaSparkTorchBuilder
 from data_builder.local_ray_builder import LocalRayBuilder
 from model.cnn_tensor import CnnTensorModel
 from model.cnn_torch import CnnTorchModel
-from image_train_raytensor import ImageTrainerTFRay
+from image_train_raytensor import build_and_train_ray_tf
 from image_train_raytorch import ImageTrainerTorchRay
 from image_train_tensor import ImageTrainerTFSingle
 from image_train_torch import ImageTrainerTorchSingle
@@ -22,7 +22,7 @@ from datetime import datetime
 
 def parse_args(argv):
     storage_f = "deltalake"
-    framework_f = "torch"
+    framework_f = "tf"
     ray_f = "0"
 
     short_opts = "h:s:f:r:"
@@ -70,10 +70,10 @@ def get_data_builder(storage, framework, ray):
         data_builder.store_data(original_file_path, is_train=True)
         data_builder.store_data(original_file_path, is_train=False)
 
-    train_data = data_builder.to_dataset(is_train=True)
-    test_data = data_builder.to_dataset(is_train=False)
+    train_data_dataset = data_builder.to_dataset(is_train=True)
+    test_dataset = data_builder.to_dataset(is_train=False)
 
-    return train_data, test_data
+    return train_data_dataset, test_dataset
 
 
 if __name__ == "__main__":
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 ImageTrainerTorchSingle.build_and_train(model, train_data, test_data, train_config)
         else:
             if ray == "1":
-                ImageTrainerTFRay.build_and_train(model, train_data, test_data, train_config)
+                build_and_train_ray_tf(model, train_data, test_data, train_config)
             else:
                 ImageTrainerTFSingle.build_and_train(model, train_data, test_data, train_config)
 
