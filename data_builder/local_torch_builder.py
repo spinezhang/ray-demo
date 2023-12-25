@@ -26,6 +26,10 @@ class LocalTorchBuilder(ImageDataBuilder):
 
     def to_dataset(self, is_train=True):
         images, labels = ImageDataBuilder.load_torchvision_data(self.data_path, is_train)
+        # load and save metadata
+        image_info = ImageDataBuilder.load_torchvision_meta(self.data_path)
+        self._metadata = image_info
+        
         features = np.array([np.frombuffer(image, dtype=np.uint8) for image in images])
         features = features.reshape(-1, 3, 32, 32).transpose((0, 2, 3, 1))
         return MemoryTorchDataset(features, labels)

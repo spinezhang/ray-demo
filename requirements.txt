@@ -1,0 +1,7 @@
+requests
+pandas==2.1.4
+deltalake==0.14.0
+psutil==5.9.6
+pyarrow==14.0.1
+tensorflow==2.15.0
+ray[default, data, train]==2.9.0

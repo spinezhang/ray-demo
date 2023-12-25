@@ -9,6 +9,7 @@ import pyarrow as pa
 
 class ImageDataBuilder:
     def __init__(self, path):
+        self._metadata = None
         self.data_path = path
 
     @staticmethod
@@ -65,3 +66,6 @@ class ImageDataBuilder:
     @abstractmethod
     def to_dataset(self, is_train=True):
         pass
+
+    def metadata(self):
+        return self._metadata

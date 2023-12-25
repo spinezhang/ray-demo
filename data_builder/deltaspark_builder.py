@@ -1,9 +1,9 @@
+import pyarrow
 import pyspark
 from delta import configure_spark_with_delta_pip
 from pyspark.sql.types import StructType, StructField, BinaryType, LongType
 
 from data_builder.deltalake_builder import DeltaLakeBuilder
-from data_builder.image_data_builder import ImageDataBuilder
 
 
 class DeltaSparkBuilder(DeltaLakeBuilder):
@@ -17,7 +17,9 @@ class DeltaSparkBuilder(DeltaLakeBuilder):
         )
         self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
-    def store_data(self, src_path, is_train=True):
-        records = ImageDataBuilder.torchvision_files_to_pyarrow_records(src_path, is_train).to_pandas()
-        df = self.spark.createDataFrame(records, StructType([StructField("id", LongType()), StructField("image", BinaryType()), StructField("label", LongType())]))
+    def store_data(self, data, metadata, is_train=True, schema=None):
+        self.update_metadata(metadata)
+        if isinstance(data, pyarrow.RecordBatch):
+            data = data.to_pandas()
+        df = self.spark.createDataFrame(data, StructType([StructField("id", LongType()), StructField("image", BinaryType()), StructField("label", LongType())]))
         df.write.format("delta").mode("overwrite").save(path=self.table_file_path(is_train))

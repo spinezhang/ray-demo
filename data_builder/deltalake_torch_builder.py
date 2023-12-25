@@ -1,5 +1,3 @@
-from deltalake import DeltaTable
-
 from data_builder.deltalake_builder import DeltaLakeBuilder
 from dataset.arrow_dataset_torch import ArrowDatasetTorch
 
@@ -9,7 +7,7 @@ class DeltaLakeTorchBuilder(DeltaLakeBuilder):
         super().__init__(path)
 
     def to_dataset(self, is_train=True):
-        delta_table = DeltaTable(self.table_file_path(is_train))
-        dataset = ArrowDatasetTorch(delta_table.to_pyarrow_dataset())
-        del delta_table
+        table = self.read_table(is_train)
+        dataset = ArrowDatasetTorch(table.to_pyarrow_dataset())
+        del table
         return dataset

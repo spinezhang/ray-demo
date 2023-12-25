@@ -14,5 +14,9 @@ class LocalRayBuilder(ImageDataBuilder):
 
     def to_dataset(self, is_train=True):
         images, labels = ImageDataBuilder.load_torchvision_data(self.data_path, is_train)
+        # load and save metadata
+        image_info = ImageDataBuilder.load_torchvision_meta(self.data_path)
+        self._metadata = image_info
+
         pa_table = pa.table([images, labels], names=["image", "label"])
         return ray.data.from_arrow(pa_table)

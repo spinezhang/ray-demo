@@ -1,10 +1,10 @@
-import numpy as np
-from petastorm import TransformSpec
-from petastorm.spark import make_spark_converter, SparkDatasetConverter
+# import numpy as np
+# from petastorm import TransformSpec
+# from petastorm.spark import make_spark_converter, SparkDatasetConverter
 
 from data_builder.deltalake_tensor_builder import DeltaLakeTensorBuilder
 from data_builder.deltaspark_builder import DeltaSparkBuilder
-from data_builder.image_data_builder import ImageDataBuilder
+# from data_builder.image_data_builder import ImageDataBuilder
 
 
 class DeltaSparkTensorBuilder(DeltaSparkBuilder, DeltaLakeTensorBuilder):

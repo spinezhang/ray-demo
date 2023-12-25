@@ -1,0 +1,10 @@
+{
+    "python.testing.pytestArgs": [
+        "tests",
+    ],
+    "python.envFile": "${workspaceFolder}/dev.env",
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "jupyter.debugJustMyCode": false
+}

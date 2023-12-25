@@ -21,6 +21,7 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
         self.train_len = config['train_len']
         self.test_len = config['test_len']
         self.work_dir = config['work_dir']
+        self.schema = config['schema']
 
     def prepare_model(self):
         self.model = ray.train.torch.prepare_model(self.model)
@@ -46,6 +47,7 @@ class ImageTrainerTorchRay(ImageTrainerTorch):
         scaling_config = ScalingConfig(num_workers=config['num_workers'], use_gpu=config['use_gpu'])
         datasets = {'train': train_data, 'test': test_data}
         config['model'] = model
+        config['schema'] = train_data.schema().base_schema
         config['train_len'] = train_data.count()
         config['test_len'] = test_data.count()
         trainer = TorchTrainer(
